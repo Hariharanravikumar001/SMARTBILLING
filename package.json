@@ -1,0 +1,24 @@
+{
+  "name": "universal-billing-saas",
+  "version": "1.0.0",
+  "description": "Universal Multi-Tenant Billing, POS, Dedicated Exchange, Inventory & Business Management SaaS",
+  "scripts": {
+    "build": "npm --prefix client run build",
+    "start": "node functions/api/index.js",
+    "dev:server": "node functions/api/index.js",
+    "dev:client": "npm --prefix client run dev",
+    "test": "npm --prefix functions/api test",
+    "test:e2e": "npm --prefix functions/api run test:e2e"
+  },
+  "keywords": [
+    "pos",
+    "billing",
+    "saas",
+    "zoho-catalyst",
+    "inventory",
+    "multi-tenant",
+    "dedicated-exchange"
+  ],
+  "author": "Universal Systems",
+  "license": "Proprietary"
+}
