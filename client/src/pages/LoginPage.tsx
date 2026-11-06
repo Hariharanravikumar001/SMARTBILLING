@@ -152,23 +152,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
             </button>
           </form>
 
-          {/* Cashier / Manager Notice */}
-          <div className="mt-5 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 text-center">
-            <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
-              Cashier & Store Staff Login
-            </p>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Cashiers and Managers log in exclusively inside the downloaded Desktop POS Software using their Name and 6-digit PIN.
-            </p>
-            <button
-              type="button"
-              onClick={() => onNavigate('terminal')}
-              className="mt-2 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
-            >
-              Launch Desktop Software Terminal &rarr;
-            </button>
-          </div>
-
           <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800 text-center">
             <p className="text-xs text-slate-500">
               New store?{' '}

@@ -25,6 +25,12 @@ test('2. POS Checkout: Atomic Sale Transaction & Stock Deduction', () => {
   const businessId = 'biz_apex_demo';
   const branchId = 'branch_apex_main';
 
+  // Ensure ample stock for test repeatability
+  run(`
+    UPDATE stock SET quantity = 30
+    WHERE business_id = ? AND branch_id = ? AND product_id = 'prod_shirt_01' AND variant_id = 'var_shirt_m_blue'
+  `, [businessId, branchId]);
+
   // Check initial stock for Cotton Oxford Shirt (variant: var_shirt_m_blue)
   const initialStock = get(`
     SELECT quantity FROM stock
@@ -83,6 +89,9 @@ test('2. POS Checkout: Atomic Sale Transaction & Stock Deduction', () => {
 test('3. Dedicated Product Exchange: Higher Price Differential & Stock Consistency', () => {
   const businessId = 'biz_apex_demo';
   const branchId = 'branch_apex_main';
+
+  // Ensure ample stock for test repeatability
+  run("UPDATE stock SET quantity = 50 WHERE business_id = ? AND branch_id = ? AND product_id IN ('prod_tshirt_02', 'prod_sneaker_03')", [businessId, branchId]);
 
   // 1. Create an initial sale of a T-Shirt (Selling Price ₹799)
   const initialSale = createSaleTransaction({
@@ -155,6 +164,9 @@ test('3. Dedicated Product Exchange: Higher Price Differential & Stock Consisten
 test('4. Dedicated Product Exchange: Defective Quarantine Handling', () => {
   const businessId = 'biz_apex_demo';
   const branchId = 'branch_apex_main';
+
+  // Ensure ample stock for test repeatability
+  run("UPDATE stock SET quantity = 50 WHERE business_id = ? AND branch_id = ? AND product_id = 'prod_leather_belt_05'", [businessId, branchId]);
 
   // Create initial sale
   const sale = createSaleTransaction({
