@@ -41,13 +41,18 @@ import { ShopReports } from './pages/shop/ShopReports';
 import { ShopSubscription } from './pages/shop/ShopSubscription';
 import { ShopSupport } from './pages/shop/ShopSupport';
 import { ShopSettings } from './pages/shop/ShopSettings';
+import { ShopSoftwareDownload } from './pages/shop/ShopSoftwareDownload';
+import { SoftwareTerminalLogin } from './pages/SoftwareTerminalLogin';
 
 export const App: React.FC = () => {
-  const { authType, isLoading } = useAuth();
+  const { authType, isLoading, logout } = useAuth();
   const { branding, isLoading: brandingLoading } = useBranding();
 
-  // Navigation states
-  const [publicView, setPublicView] = useState<'landing' | 'pricing' | 'demo' | 'login' | 'register'>('landing');
+  // Navigation states: Support desktop software launcher mode (?mode=software)
+  const isSoftwareLauncher = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mode') === 'software';
+  const [publicView, setPublicView] = useState<'landing' | 'pricing' | 'demo' | 'login' | 'register' | 'terminal'>(
+    isSoftwareLauncher ? 'terminal' : 'landing'
+  );
   const [adminTab, setAdminTab] = useState<string>('dashboard');
   const [shopTab, setShopTab] = useState<string>('pos');
 
@@ -97,10 +102,24 @@ export const App: React.FC = () => {
         {shopTab === 'expenses' && <ShopExpenses />}
         {shopTab === 'reports' && <ShopReports />}
         {shopTab === 'subscription' && <ShopSubscription />}
+        {shopTab === 'software-download' && (
+          <ShopSoftwareDownload
+            onNavigateToPricing={() => setShopTab('subscription')}
+            onLaunchTerminal={() => {
+              logout();
+              setPublicView('terminal');
+            }}
+          />
+        )}
         {shopTab === 'support' && <ShopSupport />}
         {shopTab === 'settings' && <ShopSettings />}
       </ShopLayout>
     );
+  }
+
+  // Dedicated In-Store Desktop Terminal View (Unified 6-digit PIN login for Shopkeeper, Manager, Cashier)
+  if (publicView === 'terminal') {
+    return <SoftwareTerminalLogin onExitTerminal={() => setPublicView('landing')} />;
   }
 
   // 3. PUBLIC SAAS PORTAL & SIGNUP / LOGIN

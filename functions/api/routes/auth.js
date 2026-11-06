@@ -131,15 +131,17 @@ router.post('/business/login', (req, res) => {
 const pinRateLimitMap = new Map();
 
 /**
- * Quick PIN Login (Touchscreen / POS Cashier) with Rate Limiting & Lockout
+ * Quick PIN Login (Touchscreen / POS Cashier / Manager / Shopkeeper) with Rate Limiting & Lockout
+ * Supports 6-digit PIN authentication using Name or Direct Terminal input
  */
 router.post('/business/pin-login', (req, res) => {
-  const { businessId, pin } = req.body;
-  if (!businessId || !pin) {
-    return res.status(400).json({ success: false, message: 'Business ID and 4-digit PIN are required.' });
+  const { businessId, name, pin, storeCode } = req.body;
+  if (!pin) {
+    return res.status(400).json({ success: false, message: '6-digit PIN code is required.' });
   }
 
-  const clientKey = `${req.ip || 'ip'}_${businessId}`;
+  const cleanPin = pin.toString().trim();
+  const clientKey = `${req.ip || 'ip'}_${businessId || name || storeCode || 'terminal'}`;
   const attemptRecord = pinRateLimitMap.get(clientKey) || { count: 0, lockedUntil: 0 };
   const now = Date.now();
 
@@ -147,16 +149,42 @@ router.post('/business/pin-login', (req, res) => {
     const waitSec = Math.ceil((attemptRecord.lockedUntil - now) / 1000);
     return res.status(429).json({
       success: false,
-      message: `Too many failed PIN attempts. Account locked for ${waitSec} seconds. Use email & password instead.`
+      message: `Too many failed PIN attempts. Account locked for ${waitSec} seconds. Contact store administrator.`
     });
   }
 
-  const users = all('SELECT * FROM business_users WHERE business_id = ? AND is_active = 1', [businessId]);
+  let users = [];
+  if (name) {
+    // Search by staff user name
+    if (businessId) {
+      users = all('SELECT * FROM business_users WHERE business_id = ? AND LOWER(TRIM(name)) = LOWER(TRIM(?)) AND is_active = 1', [businessId, name]);
+    } else if (storeCode) {
+      users = all(`
+        SELECT u.* FROM business_users u
+        JOIN businesses b ON b.id = u.business_id
+        WHERE (b.slug = ? OR b.id = ?) AND LOWER(TRIM(u.name)) = LOWER(TRIM(?)) AND u.is_active = 1
+      `, [storeCode, storeCode, name]);
+    } else {
+      users = all('SELECT * FROM business_users WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) AND is_active = 1', [name]);
+    }
+  } else if (businessId) {
+    users = all('SELECT * FROM business_users WHERE business_id = ? AND is_active = 1', [businessId]);
+  } else if (storeCode) {
+    users = all(`
+      SELECT u.* FROM business_users u
+      JOIN businesses b ON b.id = u.business_id
+      WHERE (b.slug = ? OR b.id = ?) AND u.is_active = 1
+    `, [storeCode, storeCode]);
+  } else {
+    // If only PIN was passed, look across all active staff
+    users = all('SELECT * FROM business_users WHERE is_active = 1');
+  }
+
   let user = null;
   for (const u of users) {
     if (!u.pin) continue;
-    // Support bcrypt hashed PIN or direct seed PIN
-    if (u.pin.startsWith('$2') ? bcrypt.compareSync(pin.toString(), u.pin) : u.pin === pin.toString()) {
+    // Support bcrypt hashed PIN or direct seed PIN (supports 6 digits)
+    if (u.pin.startsWith('$2') ? bcrypt.compareSync(cleanPin, u.pin) : u.pin === cleanPin) {
       user = u;
       break;
     }
@@ -175,14 +203,14 @@ router.post('/business/pin-login', (req, res) => {
     pinRateLimitMap.set(clientKey, attemptRecord);
     return res.status(401).json({
       success: false,
-      message: `Invalid cashier PIN code. (${5 - attemptRecord.count} attempts remaining)`
+      message: `Invalid 6-digit security PIN. (${5 - attemptRecord.count} attempts remaining)`
     });
   }
 
   // Reset rate limit on success
   pinRateLimitMap.delete(clientKey);
 
-  const business = get('SELECT * FROM businesses WHERE id = ?', [businessId]);
+  const business = get('SELECT * FROM businesses WHERE id = ?', [user.business_id]);
   if (!business || business.status === 'SUSPENDED') {
     return res.status(403).json({ success: false, message: 'Business account is not active.' });
   }
@@ -220,6 +248,38 @@ router.post('/business/pin-login', (req, res) => {
     },
     branches
   });
+});
+
+/**
+ * Public Staff List for Terminal Touchscreen Selection
+ */
+router.get('/store/staff', (req, res) => {
+  const { storeCode, businessId } = req.query;
+  let targetBizId = businessId;
+
+  if (!targetBizId && storeCode) {
+    const b = get('SELECT id FROM businesses WHERE slug = ? OR id = ?', [storeCode, storeCode]);
+    if (b) targetBizId = b.id;
+  }
+
+  if (!targetBizId) {
+    const firstBiz = get("SELECT id FROM businesses WHERE status = 'ACTIVE' LIMIT 1");
+    if (firstBiz) targetBizId = firstBiz.id;
+  }
+
+  if (!targetBizId) {
+    return res.status(404).json({ success: false, message: 'Store not found.' });
+  }
+
+  const staff = all(`
+    SELECT u.id, u.name, u.role, u.branch_id, b.name as store_name, b.slug as store_slug
+    FROM business_users u
+    JOIN businesses b ON b.id = u.business_id
+    WHERE u.business_id = ? AND u.is_active = 1
+    ORDER BY CASE u.role WHEN 'Owner' THEN 1 WHEN 'Manager' THEN 2 ELSE 3 END, u.name ASC
+  `, [targetBizId]);
+
+  res.json({ success: true, data: staff });
 });
 
 /**

@@ -109,6 +109,7 @@ app.use(['/api/cash-register', '/cash-register'], require('./routes/cashRegister
 app.use(['/api/reports', '/reports'], require('./routes/reports'));
 app.use(['/api/business', '/business'], require('./routes/business'));
 app.use(['/api/subscription', '/subscription'], require('./routes/subscription'));
+app.use(['/api/software', '/software'], require('./routes/software'));
 app.use(['/api/zoho', '/zoho'], require('./routes/zoho'));
 
 // 404 Handler

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, ArrowRight, Phone, Mail, Sparkles } from 'lucide-react';
+import { ShieldCheck, ArrowRight, Phone, Mail, Sparkles, Monitor } from 'lucide-react';
 import { useBranding } from '../../context/BrandingContext';
 
 interface PublicLayoutProps {
@@ -59,6 +59,14 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({
           </nav>
 
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setCurrentView('terminal')}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-lg border border-emerald-200 dark:border-emerald-800 transition-colors"
+            >
+              <Monitor className="w-3.5 h-3.5" />
+              <span>POS Terminal</span>
+            </button>
+
             <button
               onClick={() => setCurrentView('login')}
               className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-white transition-colors"

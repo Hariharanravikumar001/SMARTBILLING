@@ -20,7 +20,9 @@ import {
   RotateCcw,
   UserCheck,
   Sparkles,
-  Download
+  Download,
+  Lock,
+  KeyRound
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useBranding } from '../../context/BrandingContext';
@@ -63,23 +65,29 @@ export const ShopLayout: React.FC<ShopLayoutProps> = ({
     }
   };
 
-  const navItems = [
-    { id: 'pos', label: 'POS Billing', icon: ShoppingCart, highlight: true },
-    { id: 'exchange', label: 'Product Exchange', icon: RefreshCw, badge: 'Dedicated' },
-    { id: 'returns', label: 'Sales Returns', icon: RotateCcw },
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'products', label: 'Products & Catalog', icon: Package },
-    { id: 'inventory', label: 'Inventory & Stock', icon: Boxes },
-    { id: 'purchases', label: 'Purchases & Suppliers', icon: Truck },
-    { id: 'customers', label: 'Customers & Loyalty', icon: Users },
-    { id: 'staff', label: 'Staff & Cashiers', icon: UserCheck },
-    { id: 'cash-register', label: 'Cash Register & Shifts', icon: Wallet },
-    { id: 'expenses', label: 'Expenses', icon: Receipt },
-    { id: 'reports', label: 'Reports & P&L', icon: BarChart3 },
-    { id: 'subscription', label: 'My Subscription', icon: CreditCard },
-    { id: 'support', label: 'Help & Support', icon: LifeBuoy },
-    { id: 'settings', label: 'Settings', icon: Settings },
+  const userRole = businessUser?.role || 'Owner';
+
+  // Role-Separated Dashboards: Cashier, Manager, Shopkeeper (Owner)
+  const allNavItems = [
+    { id: 'pos', label: 'POS Billing', icon: ShoppingCart, highlight: true, roles: ['Owner', 'Business Administrator', 'Manager', 'Cashier'] },
+    { id: 'exchange', label: 'Product Exchange', icon: RefreshCw, badge: 'Dedicated', roles: ['Owner', 'Business Administrator', 'Manager', 'Cashier'] },
+    { id: 'returns', label: 'Sales Returns', icon: RotateCcw, roles: ['Owner', 'Business Administrator', 'Manager', 'Cashier'] },
+    { id: 'cash-register', label: 'Cash Register & Shifts', icon: Wallet, roles: ['Owner', 'Business Administrator', 'Manager', 'Cashier'] },
+    { id: 'dashboard', label: 'Store Dashboard', icon: LayoutDashboard, roles: ['Owner', 'Business Administrator', 'Manager'] },
+    { id: 'products', label: 'Products & Catalog', icon: Package, roles: ['Owner', 'Business Administrator', 'Manager'] },
+    { id: 'inventory', label: 'Inventory & Stock', icon: Boxes, roles: ['Owner', 'Business Administrator', 'Manager'] },
+    { id: 'purchases', label: 'Purchases & Suppliers', icon: Truck, roles: ['Owner', 'Business Administrator', 'Manager'] },
+    { id: 'customers', label: 'Customers & Loyalty', icon: Users, roles: ['Owner', 'Business Administrator', 'Manager'] },
+    { id: 'expenses', label: 'Expenses', icon: Receipt, roles: ['Owner', 'Business Administrator', 'Manager'] },
+    { id: 'reports', label: 'Reports & P&L', icon: BarChart3, roles: ['Owner', 'Business Administrator', 'Manager'] },
+    { id: 'staff', label: 'Staff & Cashiers (PINs)', icon: UserCheck, roles: ['Owner', 'Business Administrator'] },
+    { id: 'software-download', label: 'Download Desktop POS', icon: Download, badge: 'Software', roles: ['Owner', 'Business Administrator'] },
+    { id: 'subscription', label: 'My Subscription', icon: CreditCard, roles: ['Owner', 'Business Administrator'] },
+    { id: 'support', label: 'Help & Support', icon: LifeBuoy, roles: ['Owner', 'Business Administrator', 'Manager', 'Cashier'] },
+    { id: 'settings', label: 'Store Settings', icon: Settings, roles: ['Owner', 'Business Administrator'] },
   ];
+
+  const navItems = allNavItems.filter(item => item.roles.includes(userRole));
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden font-sans">
@@ -217,28 +225,39 @@ export const ShopLayout: React.FC<ShopLayoutProps> = ({
               <span>{new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
             </div>
 
-            <button
-              onClick={() => {
-                if (deferredPrompt) {
-                  triggerInstallPrompt();
-                } else {
-                  setShowInstallModal(true);
-                }
-              }}
-              title="Download Desktop & POS App"
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Desktop App</span>
-            </button>
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-900/60">
+              {userRole} Terminal
+            </span>
 
             <button
-              onClick={() => setCurrentTab('subscription')}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-xs font-medium shadow-sm hover:opacity-95 transition-opacity"
+              onClick={logout}
+              title="Lock Terminal & Switch Staff"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold shadow-xs transition-colors"
             >
-              <CreditCard className="w-3.5 h-3.5" />
-              <span>Plan Status</span>
+              <Lock className="w-3.5 h-3.5 text-amber-500" />
+              <span>Lock Terminal</span>
             </button>
+
+            {userRole === 'Owner' && (
+              <button
+                onClick={() => setCurrentTab('software-download')}
+                title="Download Desktop Software Package"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download Software</span>
+              </button>
+            )}
+
+            {userRole === 'Owner' && (
+              <button
+                onClick={() => setCurrentTab('subscription')}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-xs font-medium shadow-sm hover:opacity-95 transition-opacity"
+              >
+                <CreditCard className="w-3.5 h-3.5" />
+                <span>Plan Status</span>
+              </button>
+            )}
           </div>
         </header>
 

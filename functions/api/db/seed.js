@@ -262,13 +262,19 @@ function seedDatabase() {
     run(`
       INSERT INTO business_users (id, business_id, branch_id, name, email, password_hash, pin, role, phone, is_active)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, ['user_apex_owner', 'biz_apex_demo', 'branch_apex_main', 'Vikramaditya Rao', 'owner@apex.com', ownerHash, '1234', 'Owner', '+91 98450 12345', 1]);
+    `, ['user_apex_owner', 'biz_apex_demo', 'branch_apex_main', 'Vikramaditya Rao', 'owner@apex.com', ownerHash, '123456', 'Owner', '+91 98450 12345', 1]);
+
+    const managerHash = bcrypt.hashSync('Manager@2026!', salt);
+    run(`
+      INSERT INTO business_users (id, business_id, branch_id, name, email, password_hash, pin, role, phone, is_active)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, ['user_apex_manager', 'biz_apex_demo', 'branch_apex_main', 'Ananya Sharma', 'manager@apex.com', managerHash, '654321', 'Manager', '+91 98450 77777', 1]);
 
     const cashierHash = bcrypt.hashSync('Cashier@2026!', salt);
     run(`
       INSERT INTO business_users (id, business_id, branch_id, name, email, password_hash, pin, role, phone, is_active)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, ['user_apex_cashier', 'biz_apex_demo', 'branch_apex_main', 'Sumanth Kumar', 'cashier@apex.com', cashierHash, '9999', 'Cashier', '+91 98450 54321', 1]);
+    `, ['user_apex_cashier', 'biz_apex_demo', 'branch_apex_main', 'Sumanth Kumar', 'cashier@apex.com', cashierHash, '999999', 'Cashier', '+91 98450 54321', 1]);
 
     // Active Yearly Subscription
     const now = new Date();
@@ -491,6 +497,23 @@ function seedDatabase() {
       INSERT INTO feature_flags (id, flag_key, name, description, is_enabled_globally)
       VALUES (?, ?, ?, ?, ?)
     `, ['flag_03', 'enable_zoho_sync', 'Zoho CRM & Desk Cloud Sync', 'Automate lead generation and support tickets', 1]);
+  }
+
+  // Ensure 6-digit PINs and Manager user for software terminal
+  try {
+    run(`UPDATE business_users SET pin = '123456' WHERE id = 'user_apex_owner' AND (pin IS NULL OR pin = '1234')`);
+    run(`UPDATE business_users SET pin = '999999' WHERE id = 'user_apex_cashier' AND (pin IS NULL OR pin = '9999')`);
+    const existingMgr = get("SELECT id FROM business_users WHERE id = 'user_apex_manager'");
+    if (!existingMgr) {
+      const salt = bcrypt.genSaltSync(10);
+      const managerHash = bcrypt.hashSync('Manager@2026!', salt);
+      run(`
+        INSERT INTO business_users (id, business_id, branch_id, name, email, password_hash, pin, role, phone, is_active)
+        VALUES ('user_apex_manager', 'biz_apex_demo', 'branch_apex_main', 'Ananya Sharma', 'manager@apex.com', ?, '654321', 'Manager', '+91 98450 77777', 1)
+      `, [managerHash]);
+    }
+  } catch (e) {
+    // Non-fatal if table not yet populated
   }
 
   console.log('[Database] Seed initialization complete.');
