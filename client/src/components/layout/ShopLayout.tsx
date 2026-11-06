@@ -19,10 +19,12 @@ import {
   Clock,
   RotateCcw,
   UserCheck,
-  Sparkles
+  Sparkles,
+  Download
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useBranding } from '../../context/BrandingContext';
+import { InstallAppModal } from '../common/InstallAppModal';
 
 interface ShopLayoutProps {
   currentTab: string;
@@ -39,6 +41,27 @@ export const ShopLayout: React.FC<ShopLayoutProps> = ({
 }) => {
   const { business, businessUser, branches, activeBranch, setActiveBranch, logout } = useAuth();
   const { branding } = useBranding();
+  const [deferredPrompt, setDeferredPrompt] = React.useState<any>(null);
+  const [showInstallModal, setShowInstallModal] = React.useState(false);
+
+  React.useEffect(() => {
+    const handlePrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handlePrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handlePrompt);
+  }, []);
+
+  const triggerInstallPrompt = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    }
+  };
 
   const navItems = [
     { id: 'pos', label: 'POS Billing', icon: ShoppingCart, highlight: true },
@@ -131,6 +154,23 @@ export const ShopLayout: React.FC<ShopLayoutProps> = ({
           })}
         </nav>
 
+        {/* Install Desktop POS App Button in Sidebar */}
+        <div className="p-3 border-t border-slate-800">
+          <button
+            onClick={() => {
+              if (deferredPrompt) {
+                triggerInstallPrompt();
+              } else {
+                setShowInstallModal(true);
+              }
+            }}
+            className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-slate-800 hover:bg-slate-700/80 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-semibold transition-all shadow-xs"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Install Desktop App</span>
+          </button>
+        </div>
+
         {/* Shift & User Footer */}
         <div className="p-3 border-t border-slate-800 bg-slate-950/70">
           <div className="flex items-center justify-between mb-2">
@@ -178,8 +218,23 @@ export const ShopLayout: React.FC<ShopLayoutProps> = ({
             </div>
 
             <button
+              onClick={() => {
+                if (deferredPrompt) {
+                  triggerInstallPrompt();
+                } else {
+                  setShowInstallModal(true);
+                }
+              }}
+              title="Download Desktop & POS App"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Desktop App</span>
+            </button>
+
+            <button
               onClick={() => setCurrentTab('subscription')}
-              className="flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-xs font-medium shadow-sm hover:opacity-95 transition-opacity"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-xs font-medium shadow-sm hover:opacity-95 transition-opacity"
             >
               <CreditCard className="w-3.5 h-3.5" />
               <span>Plan Status</span>
@@ -192,6 +247,14 @@ export const ShopLayout: React.FC<ShopLayoutProps> = ({
           {children}
         </main>
       </div>
+
+      {/* Install App Guidance Modal */}
+      <InstallAppModal
+        isOpen={showInstallModal}
+        onClose={() => setShowInstallModal(false)}
+        deferredPrompt={deferredPrompt}
+        onInstallPrompt={triggerInstallPrompt}
+      />
     </div>
   );
 };

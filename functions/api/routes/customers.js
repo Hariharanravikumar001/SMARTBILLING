@@ -59,9 +59,9 @@ router.post('/', (req, res) => {
     return res.status(400).json({ success: false, message: 'Customer name and phone number are required.' });
   }
 
-  const existing = get('SELECT id FROM customers WHERE phone = ? AND business_id = ?', [phone.trim(), req.businessId]);
+  const existing = get('SELECT * FROM customers WHERE phone = ? AND business_id = ?', [phone.trim(), req.businessId]);
   if (existing) {
-    return res.status(409).json({ success: false, message: 'Customer with this phone number already exists.' });
+    return res.status(200).json({ success: true, message: 'Customer already exists with this phone number.', customerId: existing.id, data: existing });
   }
 
   const id = `cust_${Date.now()}`;
@@ -71,7 +71,21 @@ router.post('/', (req, res) => {
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [id, req.businessId, name, phone.trim(), email || null, gstin || null, address || null, parseFloat(credit_limit) || 0, customer_group]);
 
-  res.status(201).json({ success: true, message: 'Customer added successfully.', customerId: id });
+  const newCustomer = {
+    id,
+    business_id: req.businessId,
+    name,
+    phone: phone.trim(),
+    email: email || null,
+    gstin: gstin || null,
+    address: address || null,
+    credit_limit: parseFloat(credit_limit) || 0,
+    loyalty_points: 0,
+    outstanding_due: 0,
+    customer_group
+  };
+
+  res.status(201).json({ success: true, message: 'Customer added successfully.', customerId: id, data: newCustomer });
 });
 
 /**

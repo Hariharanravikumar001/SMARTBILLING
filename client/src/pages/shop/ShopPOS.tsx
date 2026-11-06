@@ -40,6 +40,14 @@ export const ShopPOS: React.FC = () => {
   const [customerSearch, setCustomerSearch] = useState('');
   const [customerList, setCustomerList] = useState<Customer[]>([]);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [customerModalTab, setCustomerModalTab] = useState<'search' | 'create'>('search');
+  const [newCustomerForm, setNewCustomerForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    gstin: ''
+  });
+  const [isSavingCustomer, setIsSavingCustomer] = useState(false);
 
   // Financials & Payment
   const [discountAmount, setDiscountAmount] = useState<number>(0);
@@ -279,6 +287,32 @@ export const ShopPOS: React.FC = () => {
     // Delete from held table
     await api.delete(`/pos/held/${held.id}`);
     fetchHeldBills();
+  };
+
+  // Quick Register Missing Customer at POS Counter
+  const handleQuickAddCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCustomerForm.name.trim() || !newCustomerForm.phone.trim()) {
+      alert('Please enter both customer name and phone number.');
+      return;
+    }
+    setIsSavingCustomer(true);
+    try {
+      const res: any = await api.post('/customers', newCustomerForm);
+      if (res.success && res.data) {
+        setSelectedCustomer(res.data);
+        setShowCustomerModal(false);
+        setCustomerModalTab('search');
+        setNewCustomerForm({ name: '', phone: '', email: '', gstin: '' });
+        setCustomerSearch('');
+      } else {
+        alert(res.message || 'Failed to create customer');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to register customer.');
+    } finally {
+      setIsSavingCustomer(false);
+    }
   };
 
   // Checkout Execution
@@ -657,42 +691,189 @@ export const ShopPOS: React.FC = () => {
         </div>
       </div>
 
-      {/* Customer Quick Modal */}
+      {/* Customer Quick Modal: Search or Register Missing Customer */}
       {showCustomerModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-sm text-slate-900 dark:text-white">Select or Add Customer</h3>
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-bold text-sm text-slate-900 dark:text-white">Customer Selection</h3>
               <button onClick={() => setShowCustomerModal(false)}><X className="w-4 h-4 text-slate-400" /></button>
             </div>
-            <div className="space-y-3">
-              <input
-                type="text"
-                placeholder="Search by customer phone or name..."
-                value={customerSearch}
-                onChange={async (e) => {
-                  setCustomerSearch(e.target.value);
-                  const res: any = await api.get(`/customers?search=${encodeURIComponent(e.target.value)}`);
-                  if (res.success) setCustomerList(res.data);
+
+            {/* Mode Switch Tabs */}
+            <div className="flex border border-slate-200 dark:border-slate-800 rounded-xl p-1 mb-4 bg-slate-100 dark:bg-slate-850">
+              <button
+                type="button"
+                onClick={() => setCustomerModalTab('search')}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                  customerModalTab === 'search'
+                    ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                Search Existing
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (customerSearch) {
+                    if (/^\d+$/.test(customerSearch.trim())) {
+                      setNewCustomerForm(prev => ({ ...prev, phone: customerSearch.trim() }));
+                    } else {
+                      setNewCustomerForm(prev => ({ ...prev, name: customerSearch.trim() }));
+                    }
+                  }
+                  setCustomerModalTab('create');
                 }}
-                className="w-full px-3 py-2 rounded-xl border text-xs bg-slate-50 dark:bg-slate-800"
-              />
-              <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-                {customerList.map((c) => (
-                  <div
-                    key={c.id}
-                    onClick={() => { setSelectedCustomer(c); setShowCustomerModal(false); }}
-                    className="py-2 px-1 cursor-pointer hover:bg-blue-50 dark:hover:bg-slate-800 flex justify-between"
-                  >
-                    <div>
-                      <p className="font-bold">{c.name}</p>
-                      <p className="text-[10px] text-slate-400">{c.phone}</p>
-                    </div>
-                    <span className="text-blue-600 font-semibold">{c.loyalty_points} pts</span>
-                  </div>
-                ))}
-              </div>
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                  customerModalTab === 'create'
+                    ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                + Register New
+              </button>
             </div>
+
+            {customerModalTab === 'search' ? (
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  placeholder="Search by customer phone or name..."
+                  value={customerSearch}
+                  autoFocus
+                  onChange={async (e) => {
+                    const q = e.target.value;
+                    setCustomerSearch(q);
+                    if (q.trim().length > 0) {
+                      const res: any = await api.get(`/customers?search=${encodeURIComponent(q)}`);
+                      if (res.success) setCustomerList(res.data);
+                    } else {
+                      setCustomerList([]);
+                    }
+                  }}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+
+                <div className="max-h-52 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                  {customerList.map((c) => (
+                    <div
+                      key={c.id}
+                      onClick={() => { setSelectedCustomer(c); setShowCustomerModal(false); }}
+                      className="py-2.5 px-2 cursor-pointer hover:bg-blue-50 dark:hover:bg-slate-800/80 rounded-lg flex justify-between items-center transition-colors"
+                    >
+                      <div>
+                        <p className="font-bold text-slate-800 dark:text-white">{c.name}</p>
+                        <p className="text-[11px] text-slate-400">{c.phone}</p>
+                      </div>
+                      <span className="text-blue-600 dark:text-blue-400 font-semibold text-[11px] bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full">
+                        {c.loyalty_points || 0} pts
+                      </span>
+                    </div>
+                  ))}
+
+                  {customerSearch.trim().length > 0 && customerList.length === 0 && (
+                    <div className="py-6 text-center space-y-3">
+                      <p className="text-xs text-slate-400">No customer found matching "{customerSearch}"</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (/^\d+$/.test(customerSearch.trim())) {
+                            setNewCustomerForm({ name: '', phone: customerSearch.trim(), email: '', gstin: '' });
+                          } else {
+                            setNewCustomerForm({ name: customerSearch.trim(), phone: '', email: '', gstin: '' });
+                          }
+                          setCustomerModalTab('create');
+                        }}
+                        className="w-full py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs"
+                      >
+                        + Register as New Customer
+                      </button>
+                    </div>
+                  )}
+
+                  {customerSearch.trim().length === 0 && (
+                    <div className="py-6 text-center text-xs text-slate-400">
+                      Type customer phone number or name to search
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* Register New Customer Form */
+              <form onSubmit={handleQuickAddCustomer} className="space-y-3 text-xs">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                    Customer Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Ramesh Kumar"
+                    value={newCustomerForm.name}
+                    onChange={(e) => setNewCustomerForm({ ...newCustomerForm, name: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                    Mobile Phone *
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="e.g. 9876543210"
+                    value={newCustomerForm.phone}
+                    onChange={(e) => setNewCustomerForm({ ...newCustomerForm, phone: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                    Email Address (Optional)
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="e.g. customer@example.com"
+                    value={newCustomerForm.email}
+                    onChange={(e) => setNewCustomerForm({ ...newCustomerForm, email: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                    GSTIN (For B2B Billing - Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 29ABCDE1234F1Z5"
+                    value={newCustomerForm.gstin}
+                    onChange={(e) => setNewCustomerForm({ ...newCustomerForm, gstin: e.target.value.toUpperCase() })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white uppercase focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="pt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCustomerModalTab('search')}
+                    className="flex-1 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  >
+                    Back to Search
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingCustomer}
+                    className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-bold shadow-xs transition-opacity"
+                  >
+                    {isSavingCustomer ? 'Saving...' : 'Save & Select'}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

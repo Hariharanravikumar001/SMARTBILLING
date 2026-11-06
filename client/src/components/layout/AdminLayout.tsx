@@ -13,10 +13,12 @@ import {
   LogOut,
   ShieldCheck,
   Activity,
-  Sparkles
+  Sparkles,
+  Download
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useBranding } from '../../context/BrandingContext';
+import { InstallAppModal } from '../common/InstallAppModal';
 
 interface AdminLayoutProps {
   currentTab: string;
@@ -31,6 +33,27 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 }) => {
   const { platformUser, logout } = useAuth();
   const { branding } = useBranding();
+  const [deferredPrompt, setDeferredPrompt] = React.useState<any>(null);
+  const [showInstallModal, setShowInstallModal] = React.useState(false);
+
+  React.useEffect(() => {
+    const handlePrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handlePrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handlePrompt);
+  }, []);
+
+  const triggerInstallPrompt = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    }
+  };
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -114,7 +137,22 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             </h2>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                if (deferredPrompt) {
+                  triggerInstallPrompt();
+                } else {
+                  setShowInstallModal(true);
+                }
+              }}
+              title="Download Desktop App"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Desktop App</span>
+            </button>
+
             <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-full text-xs font-medium">
               <Activity className="w-3.5 h-3.5 animate-pulse text-emerald-500" />
               <span>Production Engine Online</span>
@@ -127,6 +165,14 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
           {children}
         </main>
       </div>
+
+      {/* Install App Guidance Modal */}
+      <InstallAppModal
+        isOpen={showInstallModal}
+        onClose={() => setShowInstallModal(false)}
+        deferredPrompt={deferredPrompt}
+        onInstallPrompt={triggerInstallPrompt}
+      />
     </div>
   );
 };
