@@ -691,10 +691,16 @@ function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_products_biz ON products(business_id);
     CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(business_id, barcode);
     CREATE INDEX IF NOT EXISTS idx_products_sku ON products(business_id, sku);
+    CREATE INDEX IF NOT EXISTS idx_product_variants_prod ON product_variants(product_id);
     CREATE INDEX IF NOT EXISTS idx_stock_biz_branch ON stock(business_id, branch_id);
+    CREATE INDEX IF NOT EXISTS idx_stock_lookup ON stock(business_id, branch_id, product_id, variant_id);
+    CREATE INDEX IF NOT EXISTS idx_stock_movements_prod ON stock_movements(business_id, product_id);
     CREATE INDEX IF NOT EXISTS idx_sales_biz_invoice ON sales(business_id, invoice_no);
     CREATE INDEX IF NOT EXISTS idx_sales_created ON sales(business_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id);
+    CREATE INDEX IF NOT EXISTS idx_sale_items_prod ON sale_items(product_id);
     CREATE INDEX IF NOT EXISTS idx_exchanges_biz ON exchanges(business_id, exchange_no);
+    CREATE INDEX IF NOT EXISTS idx_exchange_items_ex ON exchange_items(exchange_id);
     CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(business_id, phone);
     CREATE INDEX IF NOT EXISTS idx_subscriptions_biz ON subscriptions(business_id);
     CREATE INDEX IF NOT EXISTS idx_audit_logs_biz ON audit_logs(business_id);

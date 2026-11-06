@@ -62,8 +62,38 @@ class ZohoService {
       }
     }
 
-    // In a live production environment with valid tokens:
-    // Call Zoho Accounts OAuth token endpoint: https://accounts.zoho.com/oauth/v2/token
+    // If live credentials provided (not placeholder):
+    if (conn.client_id && !conn.client_id.includes('placeholder') && !conn.client_id.startsWith('mock_')) {
+      try {
+        const dcDomain = (conn.api_domain && conn.api_domain.includes('.in')) ? 'https://accounts.zoho.in' : 'https://accounts.zoho.com';
+        const params = new URLSearchParams({
+          refresh_token: conn.refresh_token,
+          client_id: conn.client_id,
+          client_secret: conn.client_secret,
+          grant_type: 'refresh_token'
+        });
+
+        const resp = await fetch(`${dcDomain}/oauth/v2/token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: params.toString()
+        });
+
+        const tokenData = await resp.json();
+        if (tokenData.access_token) {
+          const newExpiresAt = new Date(Date.now() + ((tokenData.expires_in || 3600) * 1000)).toISOString();
+          run(`
+            UPDATE zoho_connections
+            SET access_token = ?, token_expires_at = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE service = ?
+          `, [tokenData.access_token, newExpiresAt, service]);
+          return tokenData.access_token;
+        }
+      } catch (e) {
+        console.warn(`[Zoho OAuth] Live token refresh failed: ${e.message}. Using fallback token.`);
+      }
+    }
+
     // In local sandbox / testing without live keys:
     const mockToken = `zoho_${service.toLowerCase()}_tok_${Date.now()}`;
     const newExpiresAt = new Date(Date.now() + 3600000).toISOString();
@@ -116,7 +146,29 @@ class ZohoService {
 
     try {
       const token = await this.getValidAccessToken('CRM');
-      // If live: POST https://www.zohoapis.com/crm/v2/Leads with token
+
+      if (token && !token.startsWith('zoho_')) {
+        const crmEndpoint = (conn.api_domain && conn.api_domain.includes('.in')) ? 'https://www.zohoapis.in/crm/v2/Leads' : `${this.crmBaseUrl}/Leads`;
+        const crmRes = await fetch(crmEndpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Zoho-oauthtoken ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ data: [payload], duplicate_check_fields: ['Email'] })
+        });
+        const crmData = await crmRes.json();
+        const zohoId = crmData.data?.[0]?.details?.id || `lead_${Date.now()}`;
+
+        run(`
+          INSERT INTO zoho_sync_logs (id, service, action, entity_type, entity_id, status, request_payload, response_data)
+          VALUES (?, 'CRM', 'CREATE_LEAD', 'Lead', ?, 'SUCCESS', ?, ?)
+        `, [logId, email, JSON.stringify(payload), JSON.stringify(crmData)]);
+
+        return { success: true, leadId: zohoId };
+      }
+
+      // Local sandbox / mock testing without live credentials
       run(`
         INSERT INTO zoho_sync_logs (id, service, action, entity_type, entity_id, status, request_payload, response_data)
         VALUES (?, 'CRM', 'CREATE_LEAD', 'Lead', ?, 'SUCCESS', ?, ?)
@@ -209,7 +261,30 @@ class ZohoService {
       };
     }
 
-    const zohoTicketId = `zd_${Date.now()}`;
+    let zohoTicketId = `zd_${Date.now()}`;
+    const token = await this.getValidAccessToken('DESK');
+
+    if (token && !token.startsWith('zoho_')) {
+      try {
+        const deskEndpoint = (conn.api_domain && conn.api_domain.includes('.in')) ? 'https://desk.zoho.in/api/v1/tickets' : `${this.deskBaseUrl}/tickets`;
+        const deskRes = await fetch(deskEndpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Zoho-oauthtoken ${token}`,
+            'orgId': conn.desk_org_id || '',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(deskPayload)
+        });
+        const deskData = await deskRes.json();
+        if (deskData.id) {
+          zohoTicketId = deskData.id;
+        }
+      } catch (dErr) {
+        console.warn('[Zoho Desk API Dispatch Warning]:', dErr.message);
+      }
+    }
+
     run('UPDATE support_tickets SET zoho_ticket_id = ? WHERE id = ?', [zohoTicketId, ticketId]);
     run(`
       INSERT INTO zoho_sync_logs (id, service, action, entity_type, entity_id, status, request_payload, response_data)

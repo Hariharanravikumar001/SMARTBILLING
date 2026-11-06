@@ -83,9 +83,9 @@ export const ShopExchange: React.FC = () => {
     }
   };
 
-  // Toggle or select item to return
+  // Toggle or select item to return by unique invoice line item ID
   const handleToggleReturnItem = (item: any) => {
-    const existingIndex = returnedItems.findIndex(r => r.productId === item.product_id);
+    const existingIndex = returnedItems.findIndex(r => (r.saleItemId && item.id) ? r.saleItemId === item.id : r.productId === item.product_id);
     if (existingIndex > -1) {
       setReturnedItems(returnedItems.filter((_, idx) => idx !== existingIndex));
     } else {
@@ -94,7 +94,8 @@ export const ShopExchange: React.FC = () => {
         {
           saleItemId: item.id,
           productId: item.product_id,
-          productName: item.product_name,
+          variantId: item.variant_id || null,
+          productName: item.variant_name ? `${item.product_name} (${item.variant_name})` : item.product_name,
           unitPrice: item.unit_price,
           taxRate: item.tax_rate,
           quantity: 1,
@@ -119,20 +120,26 @@ export const ShopExchange: React.FC = () => {
     }
     try {
       const res: any = await api.get(`/pos/lookup?q=${encodeURIComponent(q)}`);
-      if (res.success && res.data) {
-        setCatalogResults(res.data.products || res.data || []);
+      const payload = res.data?.data || res.data || res;
+      if (payload && payload.products) {
+        setCatalogResults(payload.products);
+      } else if (Array.isArray(payload)) {
+        setCatalogResults(payload);
       }
     } catch (err) {}
   };
 
-  // Add replacement product
-  const addReplacementItem = (product: any) => {
+  // Add replacement product with variant support
+  const addReplacementItem = (product: any, variant?: any) => {
+    const price = variant ? (variant.selling_price || product.selling_price) : product.selling_price;
+    const name = variant ? `${product.name} (${variant.variant_name || variant.size || variant.color || 'Variant'})` : product.name;
     setReplacementItems([
       ...replacementItems,
       {
         productId: product.id,
-        productName: product.name,
-        unitPrice: product.selling_price,
+        variantId: variant ? variant.id : null,
+        productName: name,
+        unitPrice: price,
         taxRate: product.tax_rate || 0,
         quantity: 1
       }

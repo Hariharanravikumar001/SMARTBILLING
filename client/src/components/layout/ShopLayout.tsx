@@ -17,6 +17,8 @@ import {
   Building,
   Store,
   Clock,
+  RotateCcw,
+  UserCheck,
   Sparkles
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -41,11 +43,13 @@ export const ShopLayout: React.FC<ShopLayoutProps> = ({
   const navItems = [
     { id: 'pos', label: 'POS Billing', icon: ShoppingCart, highlight: true },
     { id: 'exchange', label: 'Product Exchange', icon: RefreshCw, badge: 'Dedicated' },
+    { id: 'returns', label: 'Sales Returns', icon: RotateCcw },
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'products', label: 'Products & Catalog', icon: Package },
     { id: 'inventory', label: 'Inventory & Stock', icon: Boxes },
     { id: 'purchases', label: 'Purchases & Suppliers', icon: Truck },
     { id: 'customers', label: 'Customers & Loyalty', icon: Users },
+    { id: 'staff', label: 'Staff & Cashiers', icon: UserCheck },
     { id: 'cash-register', label: 'Cash Register & Shifts', icon: Wallet },
     { id: 'expenses', label: 'Expenses', icon: Receipt },
     { id: 'reports', label: 'Reports & P&L', icon: BarChart3 },

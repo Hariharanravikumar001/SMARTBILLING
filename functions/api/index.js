@@ -99,6 +99,7 @@ app.use(['/api/auth', '/auth'], require('./routes/auth'));
 app.use(['/api/admin', '/admin'], require('./routes/admin'));
 app.use(['/api/pos', '/pos'], require('./routes/pos'));
 app.use(['/api/exchange', '/exchange'], require('./routes/exchange'));
+app.use(['/api/returns', '/returns'], require('./routes/returns'));
 app.use(['/api/products', '/products'], require('./routes/products'));
 app.use(['/api/inventory', '/inventory'], require('./routes/inventory'));
 app.use(['/api/customers', '/customers'], require('./routes/customers'));
@@ -106,6 +107,7 @@ app.use(['/api/suppliers', '/suppliers'], require('./routes/suppliers'));
 app.use(['/api/expenses', '/expenses'], require('./routes/expenses'));
 app.use(['/api/cash-register', '/cash-register'], require('./routes/cashRegister'));
 app.use(['/api/reports', '/reports'], require('./routes/reports'));
+app.use(['/api/business', '/business'], require('./routes/business'));
 app.use(['/api/subscription', '/subscription'], require('./routes/subscription'));
 app.use(['/api/zoho', '/zoho'], require('./routes/zoho'));
 

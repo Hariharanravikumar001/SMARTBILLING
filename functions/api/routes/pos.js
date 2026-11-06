@@ -20,18 +20,39 @@ router.get('/lookup', (req, res) => {
   const branchId = req.branchId;
 
   if (!q || q.trim().length === 0) {
-    // Return top 25 active products for quick POS grid
+    // Return top active products for quick POS grid grouped without Cartesian duplication
     const products = all(`
       SELECT p.*, c.name as category_name,
-             COALESCE(s.quantity, 0) as current_stock
+             COALESCE(SUM(s.quantity), 0) as current_stock
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN stock s ON (s.product_id = p.id AND s.business_id = p.business_id AND s.branch_id = ?)
       WHERE p.business_id = ? AND p.is_active = 1
+      GROUP BY p.id
       LIMIT 30
     `, [branchId, businessId]);
 
-    return res.json({ success: true, data: products });
+    // Attach variants for each product
+    for (const p of products) {
+      if (p.has_variants) {
+        p.variants = all(`
+          SELECT v.*, COALESCE(s.quantity, 0) as current_stock
+          FROM product_variants v
+          LEFT JOIN stock s ON (s.product_id = v.product_id AND s.variant_id = v.id AND s.branch_id = ?)
+          WHERE v.product_id = ? AND v.business_id = ?
+        `, [branchId, p.id, businessId]);
+      } else {
+        p.variants = [];
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        products,
+        variants: []
+      }
+    });
   }
 
   const queryTerm = `%${q.trim()}%`;
@@ -40,14 +61,28 @@ router.get('/lookup', (req, res) => {
   // Search by exact barcode or partial name/SKU
   const products = all(`
     SELECT p.*, c.name as category_name,
-           COALESCE(s.quantity, 0) as current_stock
+           COALESCE(SUM(s.quantity), 0) as current_stock
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN stock s ON (s.product_id = p.id AND s.business_id = p.business_id AND s.branch_id = ?)
     WHERE p.business_id = ? AND p.is_active = 1
       AND (p.barcode = ? OR p.sku LIKE ? OR p.name LIKE ?)
+    GROUP BY p.id
     LIMIT 20
   `, [branchId, businessId, exactBarcode, queryTerm, queryTerm]);
+
+  for (const p of products) {
+    if (p.has_variants) {
+      p.variants = all(`
+        SELECT v.*, COALESCE(s.quantity, 0) as current_stock
+        FROM product_variants v
+        LEFT JOIN stock s ON (s.product_id = v.product_id AND s.variant_id = v.id AND s.branch_id = ?)
+        WHERE v.product_id = ? AND v.business_id = ?
+      `, [branchId, p.id, businessId]);
+    } else {
+      p.variants = [];
+    }
+  }
 
   // Also search variants
   const variants = all(`

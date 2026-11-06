@@ -115,7 +115,13 @@ router.get('/businesses', (req, res) => {
            (SELECT COUNT(*) FROM products WHERE business_id = b.id) as product_count,
            (SELECT COUNT(*) FROM sales WHERE business_id = b.id) as sale_count
     FROM businesses b
-    LEFT JOIN subscriptions s ON b.id = s.business_id
+    LEFT JOIN (
+      SELECT s1.business_id, s1.status, s1.expires_at, s1.plan_id
+      FROM subscriptions s1
+      INNER JOIN (
+        SELECT business_id, MAX(expires_at) as max_exp FROM subscriptions GROUP BY business_id
+      ) s2 ON s1.business_id = s2.business_id AND s1.expires_at = s2.max_exp
+    ) s ON b.id = s.business_id
     LEFT JOIN subscription_plans p ON s.plan_id = p.id
     WHERE 1=1
   `;
@@ -455,6 +461,72 @@ router.post('/zoho/connect', (req, res) => {
   });
 
   res.json(result);
+});
+
+/**
+ * Coupon Management Endpoints
+ */
+router.get('/coupons', (req, res) => {
+  const coupons = all(`
+    SELECT c.*,
+           (SELECT COUNT(*) FROM coupon_redemptions WHERE coupon_id = c.id) as redemption_count
+    FROM coupons c
+    ORDER BY c.created_at DESC
+  `);
+  res.json({ success: true, data: coupons });
+});
+
+router.post('/coupons', (req, res) => {
+  const { code, description, discount_type, discount_value, min_amount, max_discount, max_uses, valid_to } = req.body;
+  if (!code || !discount_type || discount_value === undefined) {
+    return res.status(400).json({ success: false, message: 'Coupon code, discount type, and discount value are required.' });
+  }
+
+  const existing = get('SELECT id FROM coupons WHERE code = ?', [code.trim().toUpperCase()]);
+  if (existing) {
+    return res.status(409).json({ success: false, message: `Coupon with code '${code.trim().toUpperCase()}' already exists.` });
+  }
+
+  const id = `coup_${Date.now()}`;
+  run(`
+    INSERT INTO coupons (
+      id, code, description, discount_type, discount_value, min_amount,
+      max_discount, valid_to, max_uses, is_active
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+  `, [
+    id, code.trim().toUpperCase(), description || '', discount_type, parseFloat(discount_value),
+    parseFloat(min_amount || 0), max_discount ? parseFloat(max_discount) : null,
+    valid_to || null, parseInt(max_uses || 100, 10)
+  ]);
+
+  res.status(201).json({ success: true, message: `Coupon '${code.trim().toUpperCase()}' created successfully.`, data: { id, code: code.trim().toUpperCase() } });
+});
+
+router.put('/coupons/:id', (req, res) => {
+  const { is_active, description, max_uses, discount_value } = req.body;
+  const coupon = get('SELECT id FROM coupons WHERE id = ?', [req.params.id]);
+  if (!coupon) {
+    return res.status(404).json({ success: false, message: 'Coupon not found.' });
+  }
+
+  let updates = [];
+  let params = [];
+  if (is_active !== undefined) { updates.push('is_active = ?'); params.push(is_active ? 1 : 0); }
+  if (description !== undefined) { updates.push('description = ?'); params.push(description); }
+  if (max_uses !== undefined) { updates.push('max_uses = ?'); params.push(parseInt(max_uses, 10)); }
+  if (discount_value !== undefined) { updates.push('discount_value = ?'); params.push(parseFloat(discount_value)); }
+
+  if (updates.length > 0) {
+    params.push(req.params.id);
+    run(`UPDATE coupons SET ${updates.join(', ')} WHERE id = ?`, params);
+  }
+
+  res.json({ success: true, message: 'Coupon updated successfully.' });
+});
+
+router.delete('/coupons/:id', (req, res) => {
+  run('DELETE FROM coupons WHERE id = ?', [req.params.id]);
+  res.json({ success: true, message: 'Coupon deleted successfully.' });
 });
 
 module.exports = router;

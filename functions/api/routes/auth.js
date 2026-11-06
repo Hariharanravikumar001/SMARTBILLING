@@ -127,8 +127,11 @@ router.post('/business/login', (req, res) => {
   });
 });
 
+// In-memory rate limiter for PIN brute force protection
+const pinRateLimitMap = new Map();
+
 /**
- * Quick PIN Login (Touchscreen / POS Cashier)
+ * Quick PIN Login (Touchscreen / POS Cashier) with Rate Limiting & Lockout
  */
 router.post('/business/pin-login', (req, res) => {
   const { businessId, pin } = req.body;
@@ -136,10 +139,48 @@ router.post('/business/pin-login', (req, res) => {
     return res.status(400).json({ success: false, message: 'Business ID and 4-digit PIN are required.' });
   }
 
-  const user = get('SELECT * FROM business_users WHERE business_id = ? AND pin = ? AND is_active = 1', [businessId, pin]);
-  if (!user) {
-    return res.status(401).json({ success: false, message: 'Invalid cashier PIN code.' });
+  const clientKey = `${req.ip || 'ip'}_${businessId}`;
+  const attemptRecord = pinRateLimitMap.get(clientKey) || { count: 0, lockedUntil: 0 };
+  const now = Date.now();
+
+  if (attemptRecord.lockedUntil > now) {
+    const waitSec = Math.ceil((attemptRecord.lockedUntil - now) / 1000);
+    return res.status(429).json({
+      success: false,
+      message: `Too many failed PIN attempts. Account locked for ${waitSec} seconds. Use email & password instead.`
+    });
   }
+
+  const users = all('SELECT * FROM business_users WHERE business_id = ? AND is_active = 1', [businessId]);
+  let user = null;
+  for (const u of users) {
+    if (!u.pin) continue;
+    // Support bcrypt hashed PIN or direct seed PIN
+    if (u.pin.startsWith('$2') ? bcrypt.compareSync(pin.toString(), u.pin) : u.pin === pin.toString()) {
+      user = u;
+      break;
+    }
+  }
+
+  if (!user) {
+    attemptRecord.count += 1;
+    if (attemptRecord.count >= 5) {
+      attemptRecord.lockedUntil = now + (10 * 60 * 1000); // 10 minute lockout
+      pinRateLimitMap.set(clientKey, attemptRecord);
+      return res.status(429).json({
+        success: false,
+        message: 'Too many failed PIN attempts. Account temporarily locked for 10 minutes.'
+      });
+    }
+    pinRateLimitMap.set(clientKey, attemptRecord);
+    return res.status(401).json({
+      success: false,
+      message: `Invalid cashier PIN code. (${5 - attemptRecord.count} attempts remaining)`
+    });
+  }
+
+  // Reset rate limit on success
+  pinRateLimitMap.delete(clientKey);
 
   const business = get('SELECT * FROM businesses WHERE id = ?', [businessId]);
   if (!business || business.status === 'SUSPENDED') {

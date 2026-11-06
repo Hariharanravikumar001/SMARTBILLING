@@ -55,6 +55,7 @@ export const ShopPOS: React.FC = () => {
   const [completedSale, setCompletedSale] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [selectedProductForVariant, setSelectedProductForVariant] = useState<Product | null>(null);
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
 
@@ -69,8 +70,11 @@ export const ShopPOS: React.FC = () => {
   const fetchProducts = async (q = '') => {
     try {
       const res: any = await api.get(`/pos/lookup?q=${encodeURIComponent(q)}`);
-      if (res.success && res.data) {
-        setProducts(res.data.products || res.data || []);
+      const payload = res.data?.data || res.data || res;
+      if (payload && payload.products) {
+        setProducts(payload.products);
+      } else if (Array.isArray(payload)) {
+        setProducts(payload);
       }
     } catch (err) {
       console.error('[POS Lookup Error]:', err);
@@ -89,6 +93,67 @@ export const ShopPOS: React.FC = () => {
       const res: any = await api.get('/pos/held');
       if (res.success) setHeldBills(res.data);
     } catch (err) {}
+  };
+
+  // Add Product with Variant selection check
+  const handleProductCardClick = (product: Product) => {
+    if (product.has_variants && product.variants && product.variants.length > 0) {
+      setSelectedProductForVariant(product);
+    } else {
+      addToCart(product);
+    }
+  };
+
+  // Add Variant directly to Cart
+  const addVariantToCart = (product: Product, variant: any) => {
+    setErrorMsg(null);
+    setCart((prevCart) => {
+      const existingIndex = prevCart.findIndex((i) => i.productId === product.id && i.variantId === variant.id);
+      const unitPrice = variant.selling_price || product.selling_price;
+      const taxRate = product.tax_rate || 0;
+
+      if (existingIndex > -1) {
+        const updated = [...prevCart];
+        const item = updated[existingIndex];
+        const newQty = item.quantity + 1;
+        const rawTotal = (newQty * item.unitPrice) - item.discountAmount;
+        const taxAmt = (rawTotal * item.taxRate) / 100;
+        updated[existingIndex] = {
+          ...item,
+          quantity: newQty,
+          taxAmount: taxAmt,
+          totalAmount: rawTotal + taxAmt
+        };
+        return updated;
+      } else {
+        const qty = 1;
+        const rawTotal = qty * unitPrice;
+        const taxAmt = (rawTotal * taxRate) / 100;
+
+        return [
+          ...prevCart,
+          {
+            productId: product.id,
+            variantId: variant.id,
+            productName: `${product.name} (${variant.variant_name || variant.size || variant.color || 'Variant'})`,
+            sku: variant.sku || product.sku,
+            barcode: variant.barcode || product.barcode,
+            unit: product.unit || 'PCS',
+            quantity: qty,
+            unitPrice,
+            taxRate,
+            taxAmount: taxAmt,
+            discountAmount: 0,
+            totalAmount: rawTotal + taxAmt,
+            currentStock: variant.current_stock ?? product.current_stock
+          }
+        ];
+      }
+    });
+
+    setSelectedProductForVariant(null);
+    setSearchQuery('');
+    if (barcodeInputRef.current) barcodeInputRef.current.focus();
   };
 
   // Add Product to Cart
@@ -344,8 +409,8 @@ export const ShopPOS: React.FC = () => {
           {filteredProducts.map((p) => (
             <div
               key={p.id}
-              onClick={() => addToCart(p)}
-              className="p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 hover:border-blue-500 hover:shadow-md cursor-pointer transition-all flex flex-col justify-between group"
+              onClick={() => handleProductCardClick(p)}
+              className="p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 hover:border-blue-500 hover:shadow-md cursor-pointer transition-all flex flex-col justify-between group relative"
             >
               <div>
                 <div className="flex justify-between items-start mb-1">
@@ -357,6 +422,11 @@ export const ShopPOS: React.FC = () => {
                 <h4 className="font-bold text-xs text-slate-900 dark:text-white line-clamp-2 leading-snug group-hover:text-blue-600">
                   {p.name}
                 </h4>
+                {p.has_variants === 1 && (
+                  <span className="inline-block mt-1 text-[9px] font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded">
+                    {p.variants?.length ? `${p.variants.length} Sizes/Variants` : 'Has Variants'}
+                  </span>
+                )}
               </div>
 
               <div className="mt-3 flex items-baseline justify-between pt-2 border-t border-slate-200/50 dark:border-slate-700/50">
@@ -716,6 +786,75 @@ export const ShopPOS: React.FC = () => {
                 className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold"
               >
                 New Sale
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Product Variant Picker Modal */}
+      {selectedProductForVariant && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-850 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in duration-150">
+            <div className="flex justify-between items-start border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div>
+                <span className="text-[10px] font-mono text-slate-400">{selectedProductForVariant.sku}</span>
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                  Select Variant: {selectedProductForVariant.name}
+                </h3>
+              </div>
+              <button
+                onClick={() => setSelectedProductForVariant(null)}
+                className="text-slate-400 hover:text-slate-600 text-lg font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500">
+              Pick the specific size, color, or specification to add to invoice:
+            </p>
+
+            <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+              {selectedProductForVariant.variants && selectedProductForVariant.variants.length > 0 ? (
+                selectedProductForVariant.variants.map((v) => (
+                  <div
+                    key={v.id}
+                    onClick={() => addVariantToCart(selectedProductForVariant, v)}
+                    className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-950/30 cursor-pointer flex items-center justify-between transition-all group"
+                  >
+                    <div>
+                      <div className="font-bold text-xs text-slate-900 dark:text-white group-hover:text-blue-600">
+                        {v.variant_name || `${v.size || ''} ${v.color || ''}`.trim() || 'Standard Variant'}
+                      </div>
+                      <div className="text-[10px] font-mono text-slate-400">
+                        SKU: {v.sku} {v.barcode ? `| Barcode: ${v.barcode}` : ''}
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="font-black text-sm text-slate-900 dark:text-white">
+                        {branding.currencySymbol}{v.selling_price || selectedProductForVariant.selling_price}
+                      </div>
+                      <div className="text-[10px] font-bold text-emerald-600">
+                        Stock: {v.current_stock ?? 'Available'}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-4 text-center text-xs text-slate-400">
+                  No variants found for this product.
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+              <button
+                onClick={() => setSelectedProductForVariant(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 rounded-xl text-xs font-bold"
+              >
+                Cancel
               </button>
             </div>
           </div>

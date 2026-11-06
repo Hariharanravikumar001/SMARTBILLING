@@ -107,6 +107,7 @@ export interface Product {
   has_variants: number;
   current_stock?: number;
   industry_data?: string;
+  variants?: ProductVariant[];
 }
 
 export interface ProductVariant {

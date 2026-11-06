@@ -21,11 +21,63 @@ export const ShopSettings: React.FC = () => {
   });
 
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleSave = (e: React.FormEvent) => {
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const res: any = await api.get('/business/settings');
+        if (res.data?.success && res.data.data) {
+          const { business: biz, settings: st } = res.data.data;
+          setSettings({
+            businessName: biz?.name || '',
+            phone: biz?.phone || '',
+            email: biz?.email || '',
+            gstin: biz?.gstin || '',
+            invoicePrefix: st?.invoice_prefix || 'INV',
+            invoiceFooter: st?.invoice_footer || 'Thank you for shopping with us! Visit again.',
+            termsConditions: st?.terms_conditions || 'Goods once sold can be exchanged within 15 days with original invoice.',
+            thermalPrinterWidth: st?.thermal_printer_width || '80mm',
+            exchangePeriodDays: st?.exchange_period_days !== undefined ? st.exchange_period_days : 15
+          });
+        }
+      } catch (err: any) {
+        console.error('Failed to load store settings:', err);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStatusMsg('Store settings & receipt template updated.');
-    setTimeout(() => setStatusMsg(null), 3000);
+    setLoading(true);
+    setErrorMsg(null);
+    setStatusMsg(null);
+
+    try {
+      const res: any = await api.put('/business/settings', {
+        name: settings.businessName,
+        phone: settings.phone,
+        gstin: settings.gstin,
+        invoice_prefix: settings.invoicePrefix,
+        invoice_footer: settings.invoiceFooter,
+        terms_conditions: settings.termsConditions,
+        thermal_printer_width: settings.thermalPrinterWidth,
+        exchange_period_days: settings.exchangePeriodDays
+      });
+
+      if (res.data?.success) {
+        setStatusMsg('Store settings & receipt template permanently saved to database.');
+        setTimeout(() => setStatusMsg(null), 4000);
+      } else {
+        setErrorMsg(res.data?.message || 'Failed to save settings.');
+      }
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.message || 'Network error saving store settings.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -48,6 +100,13 @@ export const ShopSettings: React.FC = () => {
             <span>{statusMsg}</span>
           </div>
           <button onClick={() => setStatusMsg(null)} className="text-emerald-900 font-bold">×</button>
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="p-3 bg-rose-50 text-rose-800 border border-rose-200 rounded-xl text-xs font-semibold flex items-center justify-between">
+          <span>{errorMsg}</span>
+          <button onClick={() => setErrorMsg(null)} className="text-rose-900 font-bold">×</button>
         </div>
       )}
 
@@ -169,10 +228,11 @@ export const ShopSettings: React.FC = () => {
         <div className="flex justify-end">
           <button
             type="submit"
-            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 flex items-center gap-2"
+            disabled={loading}
+            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 flex items-center gap-2"
           >
             <Save className="w-4 h-4" />
-            <span>Save Store Configuration</span>
+            <span>{loading ? 'Saving to Database...' : 'Save Store Configuration'}</span>
           </button>
         </div>
       </form>

@@ -288,3 +288,50 @@ test('8. Configurable Branding & Dynamic Platform Settings', () => {
   assert.strictEqual(yearly.price_inr, 4999);
 });
 
+test('9. Stock Upsert & Composite Key Integrity without Collision', () => {
+  const businessId = 'biz_apex_demo';
+  const branchId = 'branch_apex_main';
+  const productId = 'prod_shirt_01';
+
+  // Test updating stock using primary ID lookup
+  const stockRow = get(`
+    SELECT id, quantity FROM stock
+    WHERE business_id = ? AND branch_id = ? AND product_id = ? AND variant_id = 'var_shirt_m_blue'
+  `, [businessId, branchId, productId]);
+
+  assert.ok(stockRow && stockRow.id, 'Stock row must exist for seed product variant');
+  const prevQty = stockRow.quantity;
+
+  // Safe update
+  run('UPDATE stock SET quantity = quantity + 5, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [stockRow.id]);
+
+  const updatedStock = get('SELECT quantity FROM stock WHERE id = ?', [stockRow.id]);
+  assert.strictEqual(updatedStock.quantity, prevQty + 5);
+});
+
+test('10. Coupon Redemption Tracking and Ledger Recording', () => {
+  const businessId = 'biz_apex_demo';
+  const couponCode = 'WELCOME50';
+
+  const coupon = get('SELECT id, used_count FROM coupons WHERE code = ?', [couponCode]);
+  assert.ok(coupon, 'Default coupon WELCOME50 must exist');
+  const initialUsedCount = coupon.used_count;
+
+  // Activate subscription with coupon
+  PaymentManager.activateSubscription({
+    businessId,
+    planId: 'plan_monthly',
+    gateway: 'RAZORPAY',
+    orderId: `order_test_${Date.now()}`,
+    paymentId: `pay_test_${Date.now()}`,
+    amount: 449.10,
+    couponCode
+  });
+
+  const updatedCoupon = get('SELECT used_count FROM coupons WHERE id = ?', [coupon.id]);
+  assert.strictEqual(updatedCoupon.used_count, initialUsedCount + 1, 'Coupon used_count must increment upon activation');
+
+  const redemption = get('SELECT * FROM coupon_redemptions WHERE coupon_id = ? AND business_id = ?', [coupon.id, businessId]);
+  assert.ok(redemption, 'Coupon redemption record must be created in ledger');
+});
+

@@ -81,9 +81,10 @@ function processExchangeTransaction({
     const validatedReturns = [];
 
     for (const rItem of returnedItems) {
-      const originalSaleItem = get(`
-        SELECT * FROM sale_items WHERE sale_id = ? AND product_id = ? AND business_id = ?
-      `, [sale.id, rItem.productId, businessId]);
+      const originalSaleItem = rItem.saleItemId
+        ? get('SELECT * FROM sale_items WHERE id = ? AND sale_id = ? AND business_id = ?', [rItem.saleItemId, sale.id, businessId])
+        : (get('SELECT * FROM sale_items WHERE sale_id = ? AND product_id = ? AND (variant_id = ? OR (variant_id IS NULL AND ? IS NULL)) AND business_id = ?', [sale.id, rItem.productId, rItem.variantId || null, rItem.variantId || null, businessId])
+           || get('SELECT * FROM sale_items WHERE sale_id = ? AND product_id = ? AND business_id = ?', [sale.id, rItem.productId, businessId]));
 
       if (!originalSaleItem) {
         throw new Error(`Item ${rItem.productName || rItem.productId} was not part of the original invoice.`);

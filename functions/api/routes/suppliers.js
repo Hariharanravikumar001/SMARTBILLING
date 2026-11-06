@@ -117,19 +117,22 @@ router.post('/purchases', (req, res) => {
 
       // Update stock
       const stockRow = get(`
-        SELECT quantity FROM stock
+        SELECT id, quantity FROM stock
         WHERE business_id = ? AND branch_id = ? AND product_id = ? AND (variant_id = ? OR (variant_id IS NULL AND ? IS NULL))
       `, [req.businessId, req.branchId, product.id, item.variantId || null, item.variantId || null]);
 
       const curQty = stockRow ? stockRow.quantity : 0;
       const newQty = curQty + qty;
 
-      const stockId = `stock_${req.businessId}_${req.branchId}_${product.id}_${item.variantId || 'base'}`;
-      run(`
-        INSERT INTO stock (id, business_id, branch_id, product_id, variant_id, quantity)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET quantity = excluded.quantity, updated_at = CURRENT_TIMESTAMP
-      `, [stockId, req.businessId, req.branchId, product.id, item.variantId || null, newQty]);
+      if (stockRow) {
+        run('UPDATE stock SET quantity = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [newQty, stockRow.id]);
+      } else {
+        const stockId = `stock_${req.businessId}_${req.branchId}_${product.id}_${item.variantId || 'base'}`;
+        run(`
+          INSERT INTO stock (id, business_id, branch_id, product_id, variant_id, quantity)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `, [stockId, req.businessId, req.branchId, product.id, item.variantId || null, newQty]);
+      }
 
       run(`
         INSERT INTO stock_movements (id, business_id, branch_id, product_id, variant_id, change_qty, balance_qty, type, reason, ref_id, created_by)

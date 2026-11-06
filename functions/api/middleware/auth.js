@@ -3,7 +3,16 @@
 const jwt = require('jsonwebtoken');
 const { get, run } = require('../db');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'universal_billing_saas_secure_jwt_secret_2026';
+const isProduction = process.env.NODE_ENV === 'production';
+let JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  if (isProduction) {
+    console.error('[SECURITY CRITICAL] JWT_SECRET environment variable is not defined in production! Generating secure dynamic fallback.');
+    JWT_SECRET = require('crypto').randomBytes(32).toString('hex');
+  } else {
+    JWT_SECRET = 'universal_billing_saas_secure_jwt_secret_2026';
+  }
+}
 
 function signToken(payload, expiresIn = '24h') {
   return jwt.sign(payload, JWT_SECRET, { expiresIn });
@@ -76,7 +85,17 @@ function requireBusinessAuth(req, res, next) {
   req.businessId = business.id;
   req.business = business;
   req.user = user;
-  req.branchId = req.headers['x-branch-id'] || user.branch_id;
+
+  // Validate active branch belongs to this business tenant
+  let activeBranchId = user.branch_id;
+  const requestedBranchId = req.headers['x-branch-id'];
+  if (requestedBranchId) {
+    const validBranch = get('SELECT id FROM business_branches WHERE id = ? AND business_id = ? AND is_active = 1', [requestedBranchId, business.id]);
+    if (validBranch) {
+      activeBranchId = validBranch.id;
+    }
+  }
+  req.branchId = activeBranchId;
 
   next();
 }

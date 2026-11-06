@@ -20,10 +20,16 @@ import { AdminPlans } from './pages/admin/AdminPlans';
 import { AdminPayments } from './pages/admin/AdminPayments';
 import { AdminSettings } from './pages/admin/AdminSettings';
 import { AdminZoho } from './pages/admin/AdminZoho';
+import { AdminAuditLogs } from './pages/admin/AdminAuditLogs';
+import { AdminStaff } from './pages/admin/AdminStaff';
+import { AdminSoftwareUpdates } from './pages/admin/AdminSoftwareUpdates';
+import { AdminCoupons } from './pages/admin/AdminCoupons';
 
 // Shopkeeper Pages
 import { ShopPOS } from './pages/shop/ShopPOS';
 import { ShopExchange } from './pages/shop/ShopExchange';
+import { ShopReturns } from './pages/shop/ShopReturns';
+import { ShopStaff } from './pages/shop/ShopStaff';
 import { ShopDashboard } from './pages/shop/ShopDashboard';
 import { ShopProducts } from './pages/shop/ShopProducts';
 import { ShopInventory } from './pages/shop/ShopInventory';
@@ -63,27 +69,13 @@ export const App: React.FC = () => {
         {adminTab === 'dashboard' && <AdminDashboard />}
         {adminTab === 'businesses' && <AdminBusinesses />}
         {adminTab === 'plans' && <AdminPlans />}
+        {adminTab === 'coupons' && <AdminCoupons />}
         {adminTab === 'payments' && <AdminPayments />}
-        {adminTab === 'settings' && <AdminSettings />}
+        {adminTab === 'updates' && <AdminSoftwareUpdates />}
+        {adminTab === 'staff' && <AdminStaff />}
         {adminTab === 'zoho' && <AdminZoho />}
-        {adminTab === 'updates' && (
-          <div className="space-y-4">
-            <h2 className="text-lg font-bold">Software Versions & Feature Flags</h2>
-            <div className="p-4 bg-white dark:bg-slate-850 rounded-2xl border text-xs">
-              Current Production Version: <span className="font-mono font-bold text-blue-600">v1.0.0-PROD</span>
-              <p className="text-slate-400 mt-1">Multi-tenant isolation, Dedicated Product Exchange, and Zoho adapters are live.</p>
-            </div>
-          </div>
-        )}
-        {adminTab === 'staff' && (
-          <div className="space-y-4">
-            <h2 className="text-lg font-bold">Platform Staff & Roles</h2>
-            <div className="p-4 bg-white dark:bg-slate-850 rounded-2xl border text-xs">
-              Roles: Super Admin, Platform Administrator, Technical Administrator, DevOps, Finance Lead.
-            </div>
-          </div>
-        )}
-        {adminTab === 'audit' && <AdminDashboard />}
+        {adminTab === 'audit' && <AdminAuditLogs />}
+        {adminTab === 'settings' && <AdminSettings />}
       </AdminLayout>
     );
   }
@@ -94,11 +86,13 @@ export const App: React.FC = () => {
       <ShopLayout currentTab={shopTab} setCurrentTab={setShopTab}>
         {shopTab === 'pos' && <ShopPOS />}
         {shopTab === 'exchange' && <ShopExchange />}
+        {shopTab === 'returns' && <ShopReturns />}
         {shopTab === 'dashboard' && <ShopDashboard onNavigate={setShopTab} />}
         {shopTab === 'products' && <ShopProducts />}
         {shopTab === 'inventory' && <ShopInventory />}
         {shopTab === 'purchases' && <ShopPurchases />}
         {shopTab === 'customers' && <ShopCustomers />}
+        {shopTab === 'staff' && <ShopStaff />}
         {shopTab === 'cash-register' && <ShopCashRegister />}
         {shopTab === 'expenses' && <ShopExpenses />}
         {shopTab === 'reports' && <ShopReports />}

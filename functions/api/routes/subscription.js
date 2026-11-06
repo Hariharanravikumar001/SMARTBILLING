@@ -215,12 +215,24 @@ router.post('/initiate-order', async (req, res) => {
 });
 
 /**
- * Complete Payment & Activate Plan (Sandbox / Instant Verification)
+ * Complete Payment & Activate Plan (Cryptographically Verified)
  */
 router.post('/complete-payment', (req, res) => {
-  const { orderId, paymentId, planId, gateway = 'RAZORPAY', amount } = req.body;
+  const { orderId, paymentId, signature, planId, gateway = 'RAZORPAY', amount, couponCode } = req.body;
   if (!orderId || !planId) {
     return res.status(400).json({ success: false, message: 'Order ID and Plan ID are required.' });
+  }
+
+  // Cryptographic Signature Verification
+  const adapter = PaymentManager.getAdapter(gateway);
+  const isLive = process.env.NODE_ENV === 'production';
+  if (signature) {
+    const isValid = adapter.verifyPaymentSignature({ orderId, paymentId, signature });
+    if (!isValid && isLive) {
+      return res.status(400).json({ success: false, message: 'Invalid payment signature. Verification failed.' });
+    }
+  } else if (isLive) {
+    return res.status(400).json({ success: false, message: 'Cryptographic payment signature is required in production.' });
   }
 
   try {
@@ -230,7 +242,8 @@ router.post('/complete-payment', (req, res) => {
       gateway,
       orderId,
       paymentId: paymentId || `pay_${Date.now()}`,
-      amount: parseFloat(amount)
+      amount: amount !== undefined ? parseFloat(amount) : undefined,
+      couponCode
     });
 
     // Sync status with Zoho CRM

@@ -181,7 +181,7 @@ class PaymentManager {
   /**
    * Provision or renew subscription atomically
    */
-  activateSubscription({ businessId, planId, gateway, orderId, paymentId, amount }) {
+  activateSubscription({ businessId, planId, gateway, orderId, paymentId, amount, couponCode }) {
     const plan = get('SELECT * FROM subscription_plans WHERE id = ?', [planId]);
     if (!plan) {
       throw new Error(`Plan '${planId}' does not exist.`);
@@ -218,17 +218,37 @@ class PaymentManager {
     // Ensure business status is ACTIVE
     run("UPDATE businesses SET status = 'ACTIVE' WHERE id = ?", [businessId]);
 
+    const finalAmount = amount !== undefined && !isNaN(amount) ? parseFloat(amount) : plan.price_inr;
+
     // Record payment receipt
     const receiptNo = `RCPT-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`;
+    const spayId = `spay_${Date.now()}`;
     run(`
       INSERT INTO subscription_payments (
         id, subscription_id, business_id, plan_id, amount, gateway,
         gateway_order_id, gateway_payment_id, status, receipt_number
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
-      `spay_${Date.now()}`, subId, businessId, plan.id, amount || plan.price_inr,
+      spayId, subId, businessId, plan.id, finalAmount,
       gateway, orderId, paymentId, 'SUCCESS', receiptNo
     ]);
+
+    // Handle coupon redemption tracking if coupon was used
+    if (couponCode) {
+      try {
+        const coupon = get('SELECT id, discount_value, max_uses, used_count FROM coupons WHERE code = ? AND is_active = 1', [couponCode.trim().toUpperCase()]);
+        if (coupon) {
+          const discountApplied = Math.max(0, plan.price_inr - finalAmount);
+          run('UPDATE coupons SET used_count = used_count + 1 WHERE id = ?', [coupon.id]);
+          run(`
+            INSERT INTO coupon_redemptions (id, coupon_id, business_id, payment_id, discount_applied, redeemed_at)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          `, [`red_${Date.now()}`, coupon.id, businessId, spayId, discountApplied]);
+        }
+      } catch (couponErr) {
+        console.error('[Payment] Coupon redemption recording error:', couponErr.message);
+      }
+    }
 
     // Audit log
     run(`
@@ -236,7 +256,7 @@ class PaymentManager {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `, [
       `log_${Date.now()}`, businessId, 'SYSTEM', 'ACTIVATE_SUBSCRIPTION',
-      'subscriptions', subId, JSON.stringify({ planId: plan.id, planName: plan.name, expiresAt: newExpiresAt.toISOString(), receiptNo })
+      'subscriptions', subId, JSON.stringify({ planId: plan.id, planName: plan.name, expiresAt: newExpiresAt.toISOString(), receiptNo, couponCode })
     ]);
 
     console.log(`[Payment] Subscription ${subId} successfully activated for business ${businessId} until ${newExpiresAt.toISOString()}`);

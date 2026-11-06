@@ -44,8 +44,19 @@ export const ShopPurchases: React.FC = () => {
     productId: '',
     quantity: 10,
     purchasePrice: 100,
+    taxRate: 18.0,
     paidAmount: 1000
   });
+
+  const handleProductChange = (prodId: string) => {
+    const p = products.find(prod => prod.id === prodId);
+    setPurchaseForm({
+      ...purchaseForm,
+      productId: prodId,
+      purchasePrice: p?.purchase_price !== undefined ? p.purchase_price : purchaseForm.purchasePrice,
+      taxRate: p?.tax_rate !== undefined ? p.tax_rate : 18.0
+    });
+  };
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -96,7 +107,7 @@ export const ShopPurchases: React.FC = () => {
             productId: purchaseForm.productId,
             quantity: purchaseForm.quantity,
             purchasePrice: purchaseForm.purchasePrice,
-            taxRate: 18.0
+            taxRate: parseFloat(String(purchaseForm.taxRate)) || 0
           }
         ],
         paidAmount: purchaseForm.paidAmount
@@ -140,6 +151,7 @@ export const ShopPurchases: React.FC = () => {
                 productId: products[0]?.id || '',
                 quantity: 20,
                 purchasePrice: 150,
+                taxRate: products[0]?.tax_rate ?? 18.0,
                 paidAmount: 3000
               });
               setShowPurchaseModal(true);
@@ -362,15 +374,15 @@ export const ShopPurchases: React.FC = () => {
                 <select
                   required
                   value={purchaseForm.productId}
-                  onChange={(e) => setPurchaseForm({ ...purchaseForm, productId: e.target.value })}
+                  onChange={(e) => handleProductChange(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border text-xs bg-slate-50 dark:bg-slate-800"
                 >
                   <option value="">Select Catalog Item...</option>
-                  {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  {products.map(p => <option key={p.id} value={p.id}>{p.name} (Tax: {p.tax_rate ?? 18}%)</option>)}
                 </select>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Quantity</label>
                   <input
@@ -383,7 +395,7 @@ export const ShopPurchases: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Cost Price ({branding.currencySymbol})</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Cost ({branding.currencySymbol})</label>
                   <input
                     type="number"
                     required
@@ -391,6 +403,20 @@ export const ShopPurchases: React.FC = () => {
                     onChange={(e) => setPurchaseForm({ ...purchaseForm, purchasePrice: parseFloat(e.target.value) })}
                     className="w-full px-3 py-2 rounded-xl border text-xs font-bold bg-slate-50 dark:bg-slate-800"
                   />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">GST Tax Slab</label>
+                  <select
+                    value={purchaseForm.taxRate}
+                    onChange={(e) => setPurchaseForm({ ...purchaseForm, taxRate: parseFloat(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-xl border text-xs font-bold bg-slate-50 dark:bg-slate-800"
+                  >
+                    <option value={0}>0% (Exempt)</option>
+                    <option value={5}>5% (Apparel/Food)</option>
+                    <option value={12}>12% (Standard)</option>
+                    <option value={18}>18% (General)</option>
+                    <option value={28}>28% (Luxury)</option>
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Paid Amount</label>

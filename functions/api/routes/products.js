@@ -19,7 +19,7 @@ router.get('/', (req, res) => {
 
   let sql = `
     SELECT p.*, c.name as category_name, b.name as brand_name,
-           COALESCE(s.quantity, 0) as current_stock
+           COALESCE(SUM(s.quantity), 0) as current_stock
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
@@ -41,8 +41,11 @@ router.get('/', (req, res) => {
     const term = `%${search}%`;
     params.push(term, term, term);
   }
+
+  sql += ` GROUP BY p.id`;
+
   if (lowStockOnly === 'true') {
-    sql += ` AND COALESCE(s.quantity, 0) <= p.min_stock_alert`;
+    sql += ` HAVING current_stock <= p.min_stock_alert`;
   }
 
   sql += ` ORDER BY p.created_at DESC`;
@@ -202,6 +205,31 @@ router.put('/:id', (req, res) => {
   ]);
 
   res.json({ success: true, message: 'Product updated successfully.' });
+});
+
+/**
+ * Delete / Deactivate Product
+ */
+router.delete('/:id', (req, res) => {
+  const product = get('SELECT id, name FROM products WHERE id = ? AND business_id = ?', [req.params.id, req.businessId]);
+  if (!product) {
+    return res.status(404).json({ success: false, message: 'Product not found.' });
+  }
+
+  // Check if product has sales
+  const salesCount = get('SELECT COUNT(*) as count FROM sale_items WHERE product_id = ?', [product.id])?.count || 0;
+  if (salesCount > 0) {
+    // Soft deactivate to preserve historical invoice records
+    run('UPDATE products SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [product.id]);
+    return res.json({ success: true, message: `Product '${product.name}' deactivated because it has historical sales records.` });
+  }
+
+  // If no sales, safe to delete
+  run('DELETE FROM stock WHERE product_id = ?', [product.id]);
+  run('DELETE FROM product_variants WHERE product_id = ?', [product.id]);
+  run('DELETE FROM products WHERE id = ?', [product.id]);
+
+  res.json({ success: true, message: `Product '${product.name}' deleted successfully.` });
 });
 
 /**
