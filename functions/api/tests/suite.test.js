@@ -75,7 +75,7 @@ test('2. POS Checkout: Atomic Sale Transaction & Stock Deduction', () => {
   assert.strictEqual(saleInDb.invoice_no, saleResult.invoiceNo);
 
   // Verify cash register movement was created
-  const cashMove = get('SELECT * FROM cash_movements WHERE business_id = ? AND type = ? ORDER BY created_at DESC LIMIT 1', [businessId, 'SALE']);
+  const cashMove = get('SELECT * FROM cash_movements WHERE business_id = ? AND reason = ?', [businessId, `Cash Sale ${saleResult.invoiceNo}`]);
   assert.ok(cashMove);
   assert.strictEqual(cashMove.amount, saleResult.grandTotal);
 });

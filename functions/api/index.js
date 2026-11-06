@@ -144,7 +144,7 @@ if (require.main === module) {
 }
 
 // Export for Zoho Catalyst Advanced I/O function
-module.exports = async (req, res) => {
+const catalystHandler = async (req, res) => {
   try {
     await initUniversalDb();
     app(req, res);
@@ -154,3 +154,6 @@ module.exports = async (req, res) => {
     res.end(JSON.stringify({ success: false, message: err.message }));
   }
 };
+
+catalystHandler.app = app;
+module.exports = catalystHandler;

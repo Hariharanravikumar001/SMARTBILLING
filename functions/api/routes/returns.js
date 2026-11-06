@@ -197,7 +197,7 @@ router.post('/', (req, res) => {
 
       // 5. Cash Register movement if CASH refund
       if (refundMethod === 'CASH') {
-        const activeRegister = get('SELECT id FROM cash_registers WHERE business_id = ? AND branch_id = ? AND status = "OPEN" LIMIT 1', [req.businessId, branchId]);
+        const activeRegister = get("SELECT id FROM cash_registers WHERE business_id = ? AND branch_id = ? AND status = 'OPEN' LIMIT 1", [req.businessId, branchId]);
         if (activeRegister) {
           run(`
             INSERT INTO cash_movements (id, register_id, business_id, type, amount, reason, created_at)

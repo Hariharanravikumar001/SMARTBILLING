@@ -5,7 +5,7 @@
 	"author": "hariharanravikumar2022@gmail.com",
 	"scripts": {
 		"start": "node index.js",
-		"test": "node --test tests/suite.test.js",
+		"test": "node --test --test-concurrency=1 tests/suite.test.js tests/security_edge_cases.test.js",
 		"test:e2e": "node tests/e2e.test.js"
 	},
 	"dependencies": {

@@ -73,7 +73,16 @@ router.put('/settings', requireBusinessRole(['Owner', 'Business Administrator', 
         pincode = COALESCE(?, pincode),
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
-  `, [name, phone, gstin, address, city, state, pincode, businessId]);
+  `, [
+    name !== undefined ? name : null,
+    phone !== undefined ? phone : null,
+    gstin !== undefined ? gstin : null,
+    address !== undefined ? address : null,
+    city !== undefined ? city : null,
+    state !== undefined ? state : null,
+    pincode !== undefined ? pincode : null,
+    businessId
+  ]);
 
   // Upsert business_settings table
   run(`
